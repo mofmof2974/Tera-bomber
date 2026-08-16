@@ -1,0 +1,13 @@
+{
+  "name": "tera-bomber-event",
+  "version": "1.0.0",
+  "description": "文化祭向けのファイブボンバー風イベントのプレイ画面と管理画面",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.8.1"
+  }
+}

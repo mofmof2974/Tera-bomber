@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ファイブボンバー風ゲーム</title>
+    <style>
+      :root {
+        --bg-1: #d7f5c3;
+        --bg-2: #bef3f1;
+        --panel: rgba(15, 18, 32, 0.75);
+        --text: #f5f7ff;
+        --muted: #dfe7ff;
+        --shadow: rgba(0, 0, 0, 0.22);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family:
+          'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+        background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+        color: var(--text);
+        overflow: hidden;
+      }
+
+      body {
+        position: relative;
+      }
+
+      .field {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        background:
+          radial-gradient(
+            circle at 12% 18%,
+            rgba(255, 255, 255, 0.45),
+            transparent 18%
+          ),
+          linear-gradient(
+            180deg,
+            rgba(32, 120, 63, 0.38),
+            rgba(25, 69, 39, 0.28)
+          ),
+          linear-gradient(90deg, #6fae72 0%, #8ccf85 35%, #7fbf6a 100%);
+        overflow: hidden;
+      }
+
+      .col {
+        position: absolute;
+        top: 0;
+        width: 12.5%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding-top: 14px;
+      }
+
+      .col:before {
+        content: '';
+        position: absolute;
+        inset: 0 28% 0 28%;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.18);
+        box-shadow:
+          inset 0 0 0 4px rgba(38, 46, 55, 0.8),
+          inset 0 0 0 8px rgba(233, 238, 245, 0.9);
+      }
+
+      .player-slot {
+        position: relative;
+        z-index: 2;
+        width: 82%;
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .avatar {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #c6d7ff, #f8d5c5);
+        border: 5px solid rgba(34, 39, 49, 0.9);
+        box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        position: relative;
+      }
+
+      .avatar::after {
+        content: '';
+        position: absolute;
+        inset: 8px 10px 16px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .name-tag {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(15, 18, 32, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .score-badge {
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+      }
+
+      .ready-indicator {
+        position: absolute;
+        right: 8px;
+        top: 8px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #2ecc71;
+        box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.25);
+      }
+
+      .panel {
+        position: absolute;
+        left: 20px;
+        top: 20px;
+        width: 320px;
+        min-height: 150px;
+        border-radius: 18px;
+        background: rgba(14, 15, 22, 0.65);
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        padding: 16px 18px;
+      }
+
+      .theme-box {
+        font-size: 20px;
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+
+      .theme-box small {
+        display: block;
+        font-size: 12px;
+        opacity: 0.75;
+        margin-bottom: 6px;
+      }
+
+      .status-text {
+        font-size: 15px;
+        color: var(--muted);
+      }
+
+      .timer {
+        margin-top: 12px;
+        font-size: 30px;
+        font-weight: 900;
+        color: #ffe27a;
+      }
+
+      .logs {
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+        width: 300px;
+        background: rgba(14, 15, 22, 0.62);
+        border-radius: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        padding: 12px 14px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+      }
+
+      .logs h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+
+      .logs ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .logs li {
+        font-size: 13px;
+        color: #edf1ff;
+        opacity: 0.9;
+      }
+
+      .center-burst {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .center-burst .badge {
+        background: rgba(18, 20, 28, 0.75);
+        border: 3px solid rgba(255, 255, 255, 0.5);
+        border-radius: 999px;
+        padding: 16px 28px;
+        font-weight: 900;
+        font-size: 30px;
+        letter-spacing: 0.08em;
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.22);
+      }
+
+      @media (max-width: 900px) {
+        .panel {
+          width: 240px;
+        }
+        .logs {
+          width: 220px;
+        }
+        .avatar {
+          width: 80px;
+          height: 80px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="field" id="field">
+      <div class="panel">
+        <div class="theme-box">
+          <small>現在のテーマ</small>
+          <span id="themeValue">待機中</span>
+        </div>
+        <div class="status-text" id="statusText">参加者を待っています</div>
+        <div class="timer" id="timerValue">20</div>
+      </div>
+
+      <div class="logs">
+        <h3>イベントログ</h3>
+        <ul id="logList"></ul>
+      </div>
+
+      <div class="center-burst" id="centerBurst" hidden>
+        <div class="badge" id="centerBadge">開始</div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const field = document.getElementById('field');
+      const themeValue = document.getElementById('themeValue');
+      const statusText = document.getElementById('statusText');
+      const timerValue = document.getElementById('timerValue');
+      const logList = document.getElementById('logList');
+      const centerBurst = document.getElementById('centerBurst');
+      const centerBadge = document.getElementById('centerBadge');
+
+      const palette = [
+        '#4ecdc4',
+        '#ffe66d',
+        '#ff6b6b',
+        '#5dade2',
+        '#a8e6cf',
+        '#ffd3b6',
+        '#f7aef8',
+        '#c7ceea',
+      ];
+      const socket = io();
+      let currentState = null;
+      let timer = 20;
+      let timerHandle = null;
+
+      function renderPlayerSlots(players) {
+        const existing = [...field.querySelectorAll('.col')];
+        existing.forEach((el) => el.remove());
+
+        const sortedPlayers = [...players].sort((a, b) =>
+          a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1,
+        );
+        sortedPlayers.forEach((player, index) => {
+          const col = document.createElement('div');
+          col.className = 'col';
+          col.style.left = `${index * 12.5}%`;
+          col.style.background = 'transparent';
+
+          const slot = document.createElement('div');
+          slot.className = 'player-slot';
+
+          const avatar = document.createElement('div');
+          avatar.className = 'avatar';
+          avatar.style.background = `linear-gradient(180deg, ${player.color || '#fff'}, #f1f5ff)`;
+          avatar.textContent = player.name?.charAt(0) || 'P';
+
+          const ready = document.createElement('div');
+          ready.className = 'ready-indicator';
+          ready.style.display = player.isReady ? 'block' : 'none';
+
+          const nameTag = document.createElement('div');
+          nameTag.className = 'name-tag';
+          nameTag.textContent = player.name;
+
+          const scoreBadge = document.createElement('div');
+          scoreBadge.className = 'score-badge';
+          scoreBadge.textContent = `${player.score}pt`;
+
+          slot.appendChild(avatar);
+          slot.appendChild(ready);
+          slot.appendChild(nameTag);
+          slot.appendChild(scoreBadge);
+          col.appendChild(slot);
+          field.appendChild(col);
+        });
+      }
+
+      function renderLogs(logs = []) {
+        logList.innerHTML = '';
+        logs
+          .slice()
+          .reverse()
+          .forEach((msg) => {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            logList.appendChild(li);
+          });
+      }
+
+      function updateTimer(seconds) {
+        timerValue.textContent = String(seconds);
+      }
+
+      function startCountdown(seconds) {
+        if (timerHandle) clearInterval(timerHandle);
+        timer = seconds;
+        updateTimer(timer);
+        timerHandle = setInterval(() => {
+          timer -= 1;
+          if (timer <= 0) {
+            clearInterval(timerHandle);
+            timerHandle = null;
+            timer = 0;
+          }
+          updateTimer(timer);
+        }, 1000);
+      }
+
+      function applyState(state) {
+        currentState = state;
+        const players = state?.players || [];
+        renderPlayerSlots(players);
+        themeValue.textContent = state?.selectedTheme || '待機中';
+
+        if (state?.status === 'waiting') {
+          statusText.textContent = '参加者を待っています';
+        } else if (state?.status === 'playing') {
+          statusText.textContent = '投票タイム';
+          if (state.roundTime) startCountdown(state.roundTime);
+        } else if (state?.status === 'result') {
+          statusText.textContent = '結果発表';
+        }
+
+        if (state?.log) renderLogs(state.log);
+      }
+
+      socket.on('state:update', (state) => {
+        applyState(state);
+      });
+
+      socket.on('round:start', ({ theme, roundTime }) => {
+        centerBadge.textContent = theme || 'START';
+        centerBurst.hidden = false;
+        centerBurst.style.opacity = '1';
+        setTimeout(() => {
+          centerBurst.style.opacity = '0';
+          setTimeout(() => (centerBurst.hidden = true), 400);
+        }, 800);
+        startCountdown(roundTime || 20);
+      });
+
+      socket.on('round:end', ({ winnerId, theme }) => {
+        centerBadge.textContent = '結果';
+        centerBurst.hidden = false;
+        centerBurst.style.opacity = '1';
+        setTimeout(() => {
+          centerBurst.style.opacity = '0';
+          setTimeout(() => (centerBurst.hidden = true), 400);
+        }, 1200);
+        if (winnerId) {
+          const winner = (currentState?.players || []).find(
+            (player) => player.id === winnerId,
+          );
+          if (winner) {
+            centerBadge.textContent = `${winner.name} WIN!`;
+          }
+        }
+      });
+
+      applyState({
+        status: 'waiting',
+        round: 1,
+        roundTime: 20,
+        selectedTheme: '待機中',
+        players: [],
+        log: ['観客席を待っています。'],
+      });
+    </script>
+  </body>
+</html>
