@@ -1,13 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap');
-.helmet {
-  margin-top: 8px;
-  background: var(--ink);
-  color: #fff;
-  padding: 10px 4px;
-  border: 4px solid var(--ink);
-  font: 800 17px 'Barlow Condensed';
-  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
-}
 :root {
   --ink: #101719;
   --paper: #fffbe9;
@@ -32,9 +23,25 @@ body {
   min-height: 100vh;
   padding: 18px clamp(14px, 3vw, 48px);
   background:
-    linear-gradient(120deg, rgba(35, 85, 64, 0.95), rgba(205, 227, 125, 0.8)),
-    repeating-linear-gradient(130deg, #6e9e60 0 8px, #d3df8c 8px 18px);
+    linear-gradient(120deg, rgba(10, 20, 15, 0.82), rgba(20, 40, 25, 0.72)),
+    url('/photo/daibutuden.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   overflow: hidden;
+  transition: box-shadow 0.4s ease;
+}
+.board-screen.urgent {
+  animation: urgent-flash 0.6s steps(2, jump-none) infinite;
+}
+@keyframes urgent-flash {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(255, 60, 40, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 120px 20px rgba(255, 60, 40, 0.55);
+  }
 }
 .topbar {
   display: flex;
@@ -134,7 +141,7 @@ body {
   position: relative;
   text-align: center;
 }
-..helmet {
+.helmet {
   margin-top: 8px;
   background: var(--ink);
   color: #fff;
@@ -179,6 +186,21 @@ body {
   top: 0;
   font-size: clamp(38px, 5vw, 74px);
   filter: drop-shadow(4px 4px 0 var(--ink));
+  transition: top 1s linear;
+  animation: bomb-shake 0.5s ease-in-out infinite;
+}
+@keyframes bomb-shake {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(-6deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(6deg);
+  }
+}
+.urgent .bomb {
+  animation: bomb-shake 0.15s ease-in-out infinite;
+  filter: drop-shadow(4px 4px 0 var(--ink)) drop-shadow(0 0 14px var(--red));
 }
 .hit {
   font-size: 65px;
@@ -401,6 +423,47 @@ button {
 }
 .wrong {
   background: #ff8b80;
+}
+.answer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.answer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 2px solid var(--ink);
+  background: #fff;
+}
+.answer-label {
+  font-weight: 700;
+  font-size: 13px;
+}
+.answer-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  background: #c7c7c7;
+}
+.answer-toggle.status-correct {
+  background: #4caf50;
+}
+.answer-toggle.status-wrong {
+  background: #e53935;
+}
+.shift-control {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.shift-control button {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 13px;
+  background: #e0e0e0;
 }
 .position-control {
   display: flex;

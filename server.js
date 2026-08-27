@@ -60,8 +60,11 @@ let state = {
   bombPosition: 0,
   direction: 1,
   accepted: [],
+  rejected: [],
   answerText: '',
   status: 'ready',
+  // プレイ画面に問題文を表示するかを管理画面から手動で制御する
+  questionVisible: false,
 };
 let timer;
 
@@ -126,9 +129,11 @@ io.on('connection', (socket) => {
       state.duration = state.pendingQuestion.duration;
       state.remaining = state.duration;
       state.accepted = [];
+      state.rejected = [];
       state.bombPosition = 0;
       state.direction = 1;
       state.answerText = '';
+      state.questionVisible = true;
     }
     startTimer();
     broadcast();
@@ -139,22 +144,29 @@ io.on('connection', (socket) => {
     state.bombPosition = 0;
     state.direction = 1;
     state.accepted = [];
+    state.rejected = [];
     state.answerText = '';
+    state.questionVisible = false;
+    broadcast();
+  });
+  socket.on('admin:setQuestionVisible', (visible) => {
+    state.questionVisible = Boolean(visible);
     broadcast();
   });
   socket.on('admin:answer', ({ correct, answer }) => {
     state.answerText = String(answer || '');
-    if (correct && state.accepted.length < state.question.count) {
-      state.accepted.push(state.bombPosition);
+    io.emit('sfx', correct ? 'good' : 'bad');
+    if (correct) {
+      if (state.accepted.length < state.question.count) {
+        state.accepted.push(state.bombPosition);
+      }
+      // 正解にすると爆弾の位置を一つ進める
+      state.bombPosition = Math.min(
+        state.question.count - 1,
+        state.bombPosition + 1,
+      );
       if (state.accepted.length === state.question.count) {
         stopTimer('cleared');
-      } else {
-        state.bombPosition += state.direction;
-        if (
-          state.question.count === 10 &&
-          (state.bombPosition === 4 || state.bombPosition === 9)
-        )
-          state.direction *= -1;
       }
     }
     broadcast();
@@ -164,6 +176,41 @@ io.on('connection', (socket) => {
       0,
       Math.min(state.question.count - 1, Number(position)),
     );
+    broadcast();
+  });
+  // 小さな進む/戻すボタンで爆弾の位置を手動でシフトする
+  socket.on('admin:shiftPosition', ({ direction }) => {
+    const delta = Number(direction) >= 0 ? 1 : -1;
+    state.bombPosition = Math.max(
+      0,
+      Math.min(state.question.count - 1, state.bombPosition + delta),
+    );
+    broadcast();
+  });
+  // 文字出題型: 各回答（インデックス指定）ごとに正解/不正解/未回答を切り替える
+  socket.on('admin:markAnswer', ({ index, status }) => {
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= state.question.count) {
+      broadcast();
+      return;
+    }
+    state.accepted = state.accepted.filter((position) => position !== i);
+    state.rejected = state.rejected.filter((position) => position !== i);
+    if (status === 'correct') {
+      io.emit('sfx', 'good');
+      state.accepted.push(i);
+      // 正解にすると爆弾の位置を一つ進める
+      state.bombPosition = Math.min(
+        state.question.count - 1,
+        state.bombPosition + 1,
+      );
+    } else if (status === 'wrong') {
+      io.emit('sfx', 'bad');
+      state.rejected.push(i);
+    }
+    if (state.accepted.length === state.question.count) {
+      stopTimer('cleared');
+    }
     broadcast();
   });
 });
