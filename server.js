@@ -1,62 +1,61 @@
-const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+require('ts-node/register/transpile-only');
+const { eventData } = require('./question-list/question-list.ts');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const port = process.env.PORT || 3000;
-const questionDir = path.join(__dirname, '問題用フォルダ');
+
+// question-list.ts の問題データを管理画面/表示画面が扱う形式に変換する
+function toApiQuestion(question) {
+  const type = question.questionType === '文字出題型' ? 'char' : 'text';
+  const count = Number(question.answerCount) === 10 ? 10 : 5;
+  const duration = Number(question.timeLimit) || 60;
+  return {
+    id: question.number,
+    number: question.number,
+    type,
+    questionType: question.questionType,
+    text: question.questionText,
+    questionText: question.questionText,
+    count,
+    answerCount: String(count),
+    duration,
+    timeLimit: String(duration),
+    target: question.target || [],
+  };
+}
+
+const questions = eventData.map(toApiQuestion);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/questions', express.static(questionDir));
 app.get('/admin', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html')),
 );
 app.get('/api/questions', (req, res) => {
-  const files = fs.existsSync(questionDir) ? fs.readdirSync(questionDir) : [];
-  const questions = files
-    .filter((file) => /\.(json|txt|md)$/i.test(file))
-    .map((file) => {
-      const fullPath = path.join(questionDir, file);
-      try {
-        if (file.endsWith('.json')) {
-          const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
-          return { ...data, id: data.id || file, source: file };
-        }
-        return {
-          id: file,
-          source: file,
-          type: 'text',
-          count: 5,
-          text: fs.readFileSync(fullPath, 'utf8').trim(),
-        };
-      } catch (error) {
-        return {
-          id: file,
-          source: file,
-          type: 'text',
-          count: 5,
-          text: '読み込みエラー: ' + file,
-        };
-      }
-    });
   res.json(questions);
 });
 
-let state = {
-  question: {
-    id: 'demo',
-    type: 'text',
-    count: 5,
-    text: '文化祭へようこそ！ 管理画面から問題を選択してください。',
-    answers: [],
-  },
+const initialQuestion = questions[0] || {
+  id: 'demo',
+  number: '00',
+  type: 'text',
+  count: 5,
+  text: '文化祭へようこそ！ 管理画面から問題を選択してください。',
   duration: 60,
-  remaining: 60,
+};
+
+let state = {
+  question: initialQuestion,
+  // 管理画面でセットされ、次回タイマー開始時に反映される予定の問題
+  pendingQuestion: initialQuestion,
+  duration: initialQuestion.duration,
+  remaining: initialQuestion.duration,
   running: false,
   bombPosition: 0,
   direction: 1,
@@ -91,17 +90,25 @@ function startTimer() {
 
 io.on('connection', (socket) => {
   socket.emit('state', state);
+  // セットしただけでは進行中のラウンドには反映せず、次回のタイマー開始時に適用する
   socket.on('admin:setQuestion', (question) => {
-    state.question = {
+    const count = Number(question.count) === 10 ? 10 : 5;
+    const duration = Math.max(
+      5,
+      Math.min(600, Number(question.duration ?? question.timeLimit) || 60),
+    );
+    state.pendingQuestion = {
       ...question,
-      count: Number(question.count) === 10 ? 10 : 5,
+      count,
+      answerCount: String(count),
+      duration,
+      timeLimit: String(duration),
     };
-    state.accepted = [];
-    state.bombPosition = 0;
-    state.direction = 1;
-    state.answerText = '';
-    state.remaining = state.duration;
-    stopTimer('ready');
+    // 進行中でなければ、管理画面のタイマー表示にもセットした問題の制限時間を即反映する
+    if (state.status !== 'running') {
+      state.duration = duration;
+      state.remaining = duration;
+    }
     broadcast();
   });
   socket.on('admin:setDuration', (duration) => {
@@ -110,7 +117,20 @@ io.on('connection', (socket) => {
     broadcast();
   });
   socket.on('admin:start', () => {
-    if (state.status !== 'cleared') startTimer();
+    if (state.status === 'cleared') {
+      broadcast();
+      return;
+    }
+    if (state.status !== 'running' && state.pendingQuestion) {
+      state.question = state.pendingQuestion;
+      state.duration = state.pendingQuestion.duration;
+      state.remaining = state.duration;
+      state.accepted = [];
+      state.bombPosition = 0;
+      state.direction = 1;
+      state.answerText = '';
+    }
+    startTimer();
     broadcast();
   });
   socket.on('admin:reset', () => {
