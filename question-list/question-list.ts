@@ -43,6 +43,7 @@ export const eventData: QuestionData[] = [
     answerCount: '10',
     timeLimit: '90',
     questionType: '文字出題型',
+    target: ['Pikachu', 'Charizard', 'Squirtle', 'Bulbasaur', 'Jigglypuff', 'Meowth', 'Psyduck', 'Snorlax', 'Eevee', 'Dragonite'],
   },
   {
     number: '5',
@@ -50,6 +51,17 @@ export const eventData: QuestionData[] = [
     answerCount: '10',
     timeLimit: '90',
     questionType: '文字出題型',
-    target: ['蹴玉', '籠玉', '庭球', '排球', '避球', '羽球', '鎧球', '撞球', '氷球', '投球十柱球'],
+    target: [
+      '蹴玉',
+      '籠玉',
+      '庭球',
+      '排球',
+      '避球',
+      '羽球',
+      '鎧球',
+      '撞球',
+      '氷球',
+      '投球十柱球',
+    ],
   },
 ] as const satisfies QuestionData[];
