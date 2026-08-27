@@ -61,7 +61,7 @@ let state = {
   direction: 1,
   accepted: [],
   rejected: [],
-  answerText: '',
+  answerTexts: ['', '', '', '', ''],
   status: 'ready',
   // プレイ画面に問題文を表示するかを管理画面から手動で制御する
   questionVisible: false,
@@ -132,7 +132,7 @@ io.on('connection', (socket) => {
       state.rejected = [];
       state.bombPosition = 0;
       state.direction = 1;
-      state.answerText = '';
+      state.answerTexts = ['', '', '', '', ''];
       state.questionVisible = true;
     }
     startTimer();
@@ -145,7 +145,7 @@ io.on('connection', (socket) => {
     state.direction = 1;
     state.accepted = [];
     state.rejected = [];
-    state.answerText = '';
+    state.answerTexts = ['', '', '', '', ''];
     state.questionVisible = false;
     broadcast();
   });
@@ -153,8 +153,14 @@ io.on('connection', (socket) => {
     state.questionVisible = Boolean(visible);
     broadcast();
   });
-  socket.on('admin:answer', ({ correct, answer }) => {
-    state.answerText = String(answer || '');
+  // 問題文型: 回答者(5人)ごとの回答欄をリアルタイムにプレイ画面へ反映する
+  socket.on('admin:setAnswerText', ({ index, text }) => {
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= 5) return;
+    state.answerTexts[i] = String(text ?? '');
+    broadcast();
+  });
+  socket.on('admin:answer', ({ correct }) => {
     io.emit('sfx', correct ? 'good' : 'bad');
     if (correct) {
       if (state.accepted.length < state.question.count) {

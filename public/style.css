@@ -21,7 +21,7 @@ body {
 }
 .board-screen {
   min-height: 100vh;
-  padding: 18px clamp(14px, 3vw, 48px);
+  padding: calc(120px + 18px) clamp(14px, 3vw, 48px) 18px;
   background:
     linear-gradient(120deg, rgba(10, 20, 15, 0.82), rgba(20, 40, 25, 0.72)),
     url('/photo/daibutuden.jpg');
@@ -34,6 +34,35 @@ body {
 .board-screen.urgent {
   animation: urgent-flash 0.6s steps(2, jump-none) infinite;
 }
+.result-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font: 900 clamp(70px, 15vw, 220px) 'Barlow Condensed';
+  line-height: 0.85;
+  letter-spacing: 4px;
+  pointer-events: none;
+  -webkit-text-stroke: 10px #fff;
+  paint-order: stroke fill;
+}
+.result-banner.over {
+  background: linear-gradient(180deg, #fff1c8 0%, #ff5a3c 45%, #b3161c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(10px 10px 0 var(--ink));
+}
+.result-banner.clear {
+  background: linear-gradient(180deg, #eaffff 0%, #4fd0ff 45%, #0a63a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(10px 10px 0 var(--ink));
+}
 @keyframes urgent-flash {
   0%,
   100% {
@@ -44,50 +73,39 @@ body {
   }
 }
 .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-.brand {
-  font: 800 clamp(24px, 4vw, 52px)/0.8 'Barlow Condensed';
-  letter-spacing: 2px;
-  color: #f7ffde;
-  text-shadow: 4px 4px 0 var(--ink);
-}
-.brand strong {
-  color: var(--lime);
-}
-.question-number {
-  font: 800 18px 'Barlow Condensed';
-  color: var(--paper);
-}
-.question-number b {
-  font-size: 32px;
-  color: var(--lime);
+  position: fixed;
+  top: 10px;
+  right: 16px;
+  z-index: 11;
 }
 .timer {
-  font: 800 clamp(25px, 4vw, 48px) 'Barlow Condensed';
+  font: 800 clamp(34px, 5.5vw, 64px) 'Barlow Condensed';
   color: var(--paper);
   background: var(--ink);
-  padding: 6px 16px;
+  padding: 8px 20px;
   border: 4px solid var(--lime);
   box-shadow: 5px 5px 0 var(--lime);
 }
 .question-panel {
-  min-height: 105px;
-  margin: 22px auto 10px;
-  max-width: 1100px;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(85%, 1300px);
+  height: 120px;
+  margin: 0;
+  max-width: none;
   padding: 20px 35px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(100deg, #ffb328, #fff37c);
   border: 6px solid var(--ink);
-  box-shadow: 8px 8px 0 var(--ink);
   font-size: clamp(18px, 2.8vw, 34px);
   font-weight: 900;
   text-align: center;
+  overflow: auto;
+  z-index: 10;
 }
 .image-question {
   display: grid;
@@ -119,49 +137,43 @@ body {
     3px 3px #fff,
     -3px -3px #fff;
 }
-.status-ribbon {
-  width: max-content;
-  margin: 14px auto 0;
-  padding: 5px 26px;
-  background: var(--ink);
-  color: var(--lime);
-  font: 800 22px 'Barlow Condensed';
-  letter-spacing: 3px;
-}
 .lanes {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: clamp(5px, 1.6vw, 22px);
   max-width: 1150px;
   margin: 0 auto;
-  height: clamp(420px, 61vh, 700px);
+  height: calc(100vh - 156px);
   align-items: stretch;
 }
 .lane {
   position: relative;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .helmet {
+  flex: 0 0 auto;
   margin-top: 8px;
   background: var(--ink);
-  color: #fff;
   padding: 10px 4px;
   border: 4px solid var(--ink);
-  font: 800 17px 'Barlow Condensed';
   clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
 }
 .tube {
-  height: calc(100% - 80px);
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
-  margin: 0 10%;
+  margin: 0 10% 14px;
   border: 6px solid var(--ink);
   border-top: 0;
   background: rgba(255, 255, 255, 0.55);
   overflow: visible;
 }
-.tube:after {
-  content: '';
+.bar {
   position: absolute;
+  z-index: 1;
   left: -10px;
   right: -10px;
   top: 36%;
@@ -169,6 +181,44 @@ body {
   background: #dfe5dd;
   border: 5px solid var(--ink);
   box-shadow: 0 4px 0 #77807b;
+  transition: top 1s linear;
+  transform-origin: left center;
+}
+.bar.tilt-right {
+  transform-origin: left center;
+  animation: bar-tilt-right 0.6s ease-in-out;
+}
+.bar.tilt-left {
+  transform-origin: right center;
+  animation: bar-tilt-left 0.6s ease-in-out;
+}
+@keyframes bar-tilt-right {
+  0% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(22deg);
+  }
+  70% {
+    transform: rotate(-8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes bar-tilt-left {
+  0% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-22deg);
+  }
+  70% {
+    transform: rotate(8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
 }
 .progress {
   position: absolute;
@@ -181,37 +231,34 @@ body {
 .bomb {
   position: absolute;
   z-index: 2;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: -20%;
+  right: -20%;
+  width: 140%;
+  transform: translateY(-50%);
   top: 0;
-  font-size: clamp(38px, 5vw, 74px);
+  aspect-ratio: 1;
+  background: url('/photo/bomb.png') center / contain no-repeat;
   filter: drop-shadow(4px 4px 0 var(--ink));
   transition: top 1s linear;
-  animation: bomb-shake 0.5s ease-in-out infinite;
-}
-@keyframes bomb-shake {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) rotate(-6deg);
-  }
-  50% {
-    transform: translate(-50%, -50%) rotate(6deg);
-  }
 }
 .urgent .bomb {
-  animation: bomb-shake 0.15s ease-in-out infinite;
-  filter: drop-shadow(4px 4px 0 var(--ink)) drop-shadow(0 0 14px var(--red));
+  animation: bomb-pulse 0.5s ease-in-out infinite;
+  filter: drop-shadow(4px 4px 0 var(--ink)) drop-shadow(0 0 14px var(--red))
+    sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.95);
+}
+@keyframes bomb-pulse {
+  0%,
+  100% {
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    transform: translateY(-50%) scale(1.25);
+  }
 }
 .hit {
   font-size: 65px;
   top: auto;
   bottom: 20px;
-}
-.player-label {
-  margin-top: 9px;
-  font: 800 18px 'Barlow Condensed';
-  color: var(--paper);
-  text-shadow: 2px 2px 0 var(--ink);
 }
 .cyan .tube {
   background: linear-gradient(90deg, #8feaff, #eaffff, #55c4dc);
@@ -228,34 +275,33 @@ body {
 .red .tube {
   background: linear-gradient(90deg, #ffb1b1, #fff0f0, #ed6672);
 }
-.answer-display {
+.answer-panel {
   position: fixed;
   bottom: 18px;
   left: 20px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--paper);
+  border: 6px solid var(--ink);
+  box-shadow: 8px 8px 0 var(--ink);
+  padding: 18px 24px;
+  max-width: calc(60% - 40px);
+}
+.answer-slot {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--paper);
-  border: 5px solid var(--ink);
-  box-shadow: 6px 6px 0 var(--ink);
-  padding: 10px 16px;
-  max-width: calc(100% - 40px);
+  gap: 16px;
+  font-size: clamp(20px, 2vw, 30px);
+  font-weight: 700;
 }
-.answer-display span {
-  font: 800 16px 'Barlow Condensed';
+.answer-slot-label {
+  font: 800 clamp(18px, 1.6vw, 24px) 'Barlow Condensed';
   color: var(--red);
+  min-width: 40px;
 }
-.answer-display b {
-  font-size: 18px;
-}
-footer {
-  display: flex;
-  justify-content: center;
-  gap: 28px;
-  color: var(--paper);
-  font: 700 14px 'Barlow Condensed';
-  letter-spacing: 2px;
-  margin: 18px;
+  min-width: 24px;
 }
 .admin-shell {
   min-height: 100vh;
@@ -429,6 +475,22 @@ button {
   flex-wrap: wrap;
   gap: 8px;
 }
+.answer-fields {
+  flex-wrap: wrap;
+}
+.answer-fields label {
+  flex: 1 1 45%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.answer-fields input {
+  padding: 6px 8px;
+  border: 2px solid var(--ink);
+  font-size: 15px;
+}
 .answer-item {
   display: flex;
   align-items: center;
@@ -501,28 +563,17 @@ button {
     grid-template-columns: 1fr;
   }
   .lanes {
-    height: 50vh;
+    height: calc(100vh - 136px);
   }
   .helmet {
-    font-size: 11px;
     padding: 6px 0;
   }
-  .player-label {
-    font-size: 11px;
-  }
   .question-panel {
-    margin-top: 12px;
+    width: min(94%, 700px);
     padding: 12px;
+    height: 100px;
   }
-  .answer-display {
-    bottom: 8px;
-  }
-  .topbar {
-    flex-wrap: wrap;
-  }
-  .question-number {
-    order: 3;
-    width: 100%;
-    text-align: center;
+  .board-screen {
+    padding-top: calc(100px + 18px);
   }
 }
