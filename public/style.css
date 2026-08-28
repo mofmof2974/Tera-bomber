@@ -125,17 +125,42 @@ body {
   height: 100%;
   object-fit: cover;
 }
+.target-panel {
+  position: fixed;
+  top: 150px;
+  right: clamp(14px, 3vw, 48px);
+  z-index: 9;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(84px, 1fr));
+  gap: 8px;
+  width: min(26vw, 320px);
+  max-height: calc(100vh - 185px);
+  padding: 12px;
+  overflow: auto;
+  background: linear-gradient(145deg, #fff37c, #ffb328);
+  border: 6px solid var(--ink);
+}
+.target-panel .char-tile {
+  position: relative;
+  min-height: 64px;
+  border: 4px solid var(--ink);
+}
 .check,
 .hit {
   position: absolute;
-  inset: 0;
   display: grid;
   place-items: center;
-  color: var(--red);
-  font: bold 80px Arial;
-  text-shadow:
-    3px 3px #fff,
-    -3px -3px #fff;
+}
+.check {
+  top: 50%;
+  left: 50%;
+  width: min(42%, 58px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: clamp(4px, 0.5vw, 7px) solid var(--red);
+  border-radius: 50%;
+  background: rgba(255, 75, 62, 0.16);
+  box-shadow: 0 0 0 3px #fff;
 }
 .lanes {
   display: grid;
@@ -572,6 +597,19 @@ button {
     width: min(94%, 700px);
     padding: 12px;
     height: 100px;
+  }
+  .target-panel {
+    top: 112px;
+    right: 3%;
+    width: 94%;
+    max-height: 92px;
+    grid-template-columns: repeat(5, minmax(48px, 1fr));
+    padding: 6px;
+    gap: 5px;
+  }
+  .target-panel .char-tile {
+    min-height: 54px;
+    border-width: 3px;
   }
   .board-screen {
     padding-top: calc(100px + 18px);

@@ -25,16 +25,24 @@ document.addEventListener('input', (event) => {
 // タイマー開始中に流すBGMと正解/不正解の効果音、クリア/時間切れ時に流すBGM
 const bgmAudio = new Audio('/bgm/normalbgm.mp3');
 bgmAudio.loop = true;
-const goodAudio = new Audio('/bgm/goodsound.mp3');
-const badAudio = new Audio('/bgm/badsound.mp3');
+const SFX_POOL_SIZE = 4;
+const goodAudios = Array.from(
+  { length: SFX_POOL_SIZE },
+  () => new Audio('/bgm/goodsound.mp3'),
+);
+const badAudios = Array.from(
+  { length: SFX_POOL_SIZE },
+  () => new Audio('/bgm/badsound.mp3'),
+);
 const clearAudio = new Audio('/bgm/clearbgm.mp3');
 const failAudio = new Audio('/bgm/failbgm.mp3');
 // ブラウザの自動再生制限を回避するため、初回操作時に無音再生して再生を許可させる
 let audioUnlocked = false;
+const sfxAudios = [...goodAudios, ...badAudios];
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  [bgmAudio, goodAudio, badAudio, clearAudio, failAudio].forEach((audio) => {
+  [bgmAudio, ...sfxAudios, clearAudio, failAudio].forEach((audio) => {
     audio
       .play()
       .then(() => {
@@ -46,6 +54,13 @@ function unlockAudio() {
 }
 document.addEventListener('click', unlockAudio, { once: true });
 document.addEventListener('keydown', unlockAudio, { once: true });
+function playSfx(type) {
+  const audios = type === 'good' ? goodAudios : badAudios;
+  const audio = audios.find((candidate) => candidate.paused || candidate.ended);
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
 let previousStatus = null;
 // 正解時、爆弾が隣のレーンへ移る直前のレーン位置のバーを一瞬傾ける演出
 let tiltLane = null;
@@ -57,10 +72,7 @@ const BAR_TOUCH_OFFSET = 12;
 let barHeights = Array(5).fill(BAR_TOUCH_OFFSET);
 let frozenLanes = Array(5).fill(false);
 socket.on('sfx', (type) => {
-  const audio = type === 'good' ? goodAudio : type === 'bad' ? badAudio : null;
-  if (!audio) return;
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
+  if (type === 'good' || type === 'bad') playSfx(type);
   if (type === 'good' && currentState) {
     const count = normalizeAnswerCount(
       currentState.question?.count ?? currentState.question?.answerCount,
@@ -229,18 +241,20 @@ function boardTemplate(state) {
       ? images
           .map(
             (image, i) =>
-              `<div class="question-image"><img src="${escapeHtml(image)}" alt="出題画像 ${i + 1}">${state.accepted.includes(i) ? '<span class="check">✓</span>' : ''}</div>`,
+              `<div class="question-image"><img src="${escapeHtml(image)}" alt="出題画像 ${i + 1}">${state.accepted.includes(i) ? '<span class="check" aria-label="正解"></span>' : ''}</div>`,
           )
           .join('')
-      : normalizedType === 'char'
-        ? targetList
-            .map(
-              (item, i) =>
-                `<div class="question-image char-tile"><span>${escapeHtml(item)}</span>${state.accepted.includes(i) ? '<span class="check">✓</span>' : ''}</div>`,
-            )
-            .join('')
-        : `<p>${escapeHtml(questionText)}</p>`
+      : `<p>${escapeHtml(questionText)}</p>`
     : '';
+  const targetPanel =
+    normalizedType === 'char' && isQuestionVisible
+      ? `<aside class="target-panel" aria-label="出題対象">${targetList
+          .map(
+            (item, i) =>
+              `<div class="char-tile"><span>${escapeHtml(item)}</span>${state.accepted.includes(i) ? '<span class="check" aria-label="正解"></span>' : ''}</div>`,
+          )
+          .join('')}</aside>`
+      : '';
   const isUrgent = isActive && state.remaining <= 10;
   // クリア/オーバー後もその瞬間の爆弾位置・水位で画面を固定表示する
   const isFrozen = state.status === 'cleared' || state.status === 'over';
@@ -273,7 +287,8 @@ function boardTemplate(state) {
     .join('');
   return `<section class="board-screen ${state.status}${isUrgent ? ' urgent' : ''}">
     <header class="topbar"><div class="timer">${timerText}</div></header>
-    <div class="question-panel ${isQuestionVisible && (normalizedType === 'image' || normalizedType === 'char') ? 'image-question' : ''}">${questionPanelContent}</div>
+    <div class="question-panel ${isQuestionVisible && normalizedType === 'image' ? 'image-question' : ''}">${questionPanelContent}</div>
+    ${targetPanel}
     <div class="lanes">${laneHtml}</div>
     <div class="answer-panel">${answerTexts.map((text, i) => `<div class="answer-slot"><span class="answer-slot-label">P${i + 1}</span><b>${escapeHtml(text) || '　'}</b></div>`).join('')}</div>
     ${resultBanner}
