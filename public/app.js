@@ -3,6 +3,30 @@ const isAdmin = location.pathname === '/admin';
 let currentState;
 let availableQuestions = [];
 const colors = ['cyan', 'green', 'yellow', 'orange', 'red'];
+let playScreenStarted = isAdmin;
+
+function isPlayScreenFullscreen() {
+  return document.fullscreenElement === document.documentElement;
+}
+
+async function togglePlayScreenFullscreen() {
+  try {
+    if (isPlayScreenFullscreen()) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch {}
+}
+
+async function startPlayScreen() {
+  try {
+    await document.documentElement.requestFullscreen();
+    playScreenStarted = true;
+    render();
+  } catch {}
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (!isAdmin && currentState) render();
+});
 // 回答ステップ(bombPosition, 0始まり)を実際のレーン(0-4)へ変換する。
 // 5問なら単純に1対1、10問は右端(P5)まで進んだあと折り返して逆順にもう一周する
 // 「往復」順序になるため、専用の対応表を使う
@@ -285,13 +309,20 @@ function boardTemplate(state) {
       return `<div class="lane ${colors[i % 5]}"><div class="helmet"></div><div class="tube"><div class="progress" style="height:${isRoundVisual && isBombLane ? Math.max(8, 100 - (state.remaining / state.duration) * 100) : 8}%"></div><div class="bar${tiltClass}" style="top:${barTop}%"></div>${isBombLane && state.status !== 'cleared' ? `<div class="bomb" style="top:${bombTop}%"></div>` : ''}${state.accepted.some((acceptedStep) => laneForStep(acceptedStep, count) === position) ? '<div class="hit">✓</div>' : ''}</div></div>`;
     })
     .join('');
+  const fullscreenLabel = isPlayScreenFullscreen()
+    ? '全画面を終了'
+    : '全画面にする';
+  const fullscreenStart = playScreenStarted
+    ? ''
+    : '<div class="fullscreen-start"><button id="start-play-screen" type="button">全画面で開始</button></div>';
   return `<section class="board-screen ${state.status}${isUrgent ? ' urgent' : ''}">
-    <header class="topbar"><div class="timer">${timerText}</div></header>
+    <header class="topbar"><div class="timer">${timerText}</div><button class="fullscreen-toggle" id="toggle-fullscreen" type="button" aria-pressed="${isPlayScreenFullscreen()}" aria-label="${fullscreenLabel}">${fullscreenLabel}</button></header>
     <div class="question-panel ${isQuestionVisible && normalizedType === 'image' ? 'image-question' : ''}">${questionPanelContent}</div>
     ${targetPanel}
     <div class="lanes">${laneHtml}</div>
     <div class="answer-panel">${answerTexts.map((text, i) => `<div class="answer-slot"><span class="answer-slot-label">P${i + 1}</span><b>${escapeHtml(text) || '　'}</b></div>`).join('')}</div>
     ${resultBanner}
+    ${fullscreenStart}
   </section>`;
 }
 function adminTemplate(state) {
@@ -368,6 +399,8 @@ function adminTemplate(state) {
 }
 document.addEventListener('click', (event) => {
   const id = event.target.id;
+  if (id === 'toggle-fullscreen') togglePlayScreenFullscreen();
+  if (id === 'start-play-screen') startPlayScreen();
   if (id === 'start') socket.emit('admin:start');
   if (id === 'reset') socket.emit('admin:reset');
   if (id === 'toggle-question-visible')
