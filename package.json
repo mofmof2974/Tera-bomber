@@ -4,11 +4,13 @@
   "private": true,
   "description": "文化祭用ファイブボンバー司会システム",
   "scripts": {
-    "dev": "wrangler pages dev public",
-    "deploy": "wrangler pages deploy public"
+    "dev": "wrangler pages dev -c wrangler.toml -c worker/wrangler.toml",
+    "deploy:worker": "wrangler deploy --config worker/wrangler.toml",
+    "deploy": "wrangler pages deploy public",
+    "deploy:all": "npm run deploy:worker && npm run deploy"
   },
   "devDependencies": {
     "typescript": "5.6.3",
-    "wrangler": "^3.90.0"
+    "wrangler": "^4.130.0"
   }
 }

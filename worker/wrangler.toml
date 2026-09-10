@@ -1,0 +1,7 @@
+name = "tera-bomber-game-state"
+main = "game-state.js"
+compatibility_date = "2024-09-23"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameState"]

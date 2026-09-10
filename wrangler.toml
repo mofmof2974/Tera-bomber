@@ -2,10 +2,8 @@ name = "tera-bomber"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "public"
 
+# Durable Objectはpages project内で定義できないため、別デプロイのWorker(worker/)を参照する
 [[durable_objects.bindings]]
 name = "GAME_STATE"
 class_name = "GameState"
-
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["GameState"]
+script_name = "tera-bomber-game-state"
