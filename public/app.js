@@ -1,4 +1,44 @@
-const socket = io();
+// Socket.ioからDurable Object経由のネイティブWebSocketへ移行したため、
+// 既存コード(socket.on/socket.emit呼び出し)をそのまま使える薄い互換ラッパーを用意する
+function createSocket() {
+  const listeners = {};
+  let ws;
+  let reconnectDelay = 1000;
+  function connect() {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${protocol}://${location.host}/ws`);
+    ws.addEventListener('open', () => {
+      reconnectDelay = 1000;
+    });
+    ws.addEventListener('message', (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const handlers = listeners[payload.event];
+      if (handlers) handlers.forEach((handler) => handler(payload.data));
+    });
+    ws.addEventListener('close', () => {
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+    });
+    ws.addEventListener('error', () => ws.close());
+  }
+  connect();
+  return {
+    on(event, handler) {
+      (listeners[event] ||= []).push(handler);
+    },
+    emit(event, data) {
+      const payload = JSON.stringify({ event, data });
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+      else ws.addEventListener('open', () => ws.send(payload), { once: true });
+    },
+  };
+}
+const socket = createSocket();
 const isAdmin = location.pathname === '/admin';
 let currentState;
 let availableQuestions = [];
@@ -69,6 +109,7 @@ let tiltTimeout = null;
 // バーが爆弾の下端に接する際のオフセット(%)。未停止のバーは全レーンとも爆弾と同じ
 // 落下率でずっと落ち続け、正解が押された回答者のレーンだけその高さで停止する
 const BAR_TOUCH_OFFSET = 12;
+const BAR_FALL_RANGE = 100 - BAR_TOUCH_OFFSET;
 let barHeights = Array(5).fill(BAR_TOUCH_OFFSET);
 let frozenLanes = Array(5).fill(false);
 socket.on('sfx', (type) => {
@@ -84,14 +125,15 @@ socket.on('sfx', (type) => {
     // 10問で右端まで達したあとの2週目(左へ爆弾を渡す間)はバーも左向きに傾ける
     tiltDirection = count === 10 && step >= 5 ? 'left' : 'right';
     // 停止する瞬間の高さ(爆弾が今いる高さ+接触オフセット)でそのレーンのバーを固定する
-    const bombTop = Math.max(
+    const fallProgress = Math.max(
       0,
-      Math.min(85, (1 - currentState.remaining / currentState.duration) * 100),
+      Math.min(1, 1 - currentState.remaining / currentState.duration),
     );
+    const bombTop = fallProgress * BAR_FALL_RANGE;
     // 10問の場合、各回答者は2回答えるまで停止しない(ステップ0-4が1回目、5-9が2回目)
     const shouldFreeze = count !== 10 || step >= 5;
     if (shouldFreeze) {
-      barHeights[lane] = Math.min(96, bombTop + BAR_TOUCH_OFFSET);
+      barHeights[lane] = bombTop + BAR_TOUCH_OFFSET;
       frozenLanes[lane] = true;
     }
     clearTimeout(tiltTimeout);
@@ -268,21 +310,22 @@ function boardTemplate(state) {
   const answerTexts = state.answerTexts || ['', '', '', '', ''];
   // 停止していないレーンのバーは全て爆弾と同じ落下率で一緒に落ち続ける。
   // 正解が押されて停止(frozen)したレーンだけ、その高さのまま動かなくなる
-  const bombTop = isRoundVisual
-    ? Math.max(0, Math.min(85, (1 - state.remaining / state.duration) * 100))
+  const fallProgress = isRoundVisual
+    ? Math.max(0, Math.min(1, 1 - state.remaining / state.duration))
     : 0;
+  const bombTop = fallProgress * BAR_FALL_RANGE;
   const laneHtml = positions
     .map((position, i) => {
       const isBombLane = laneForStep(state.bombPosition, count) === position;
       const isLaneFrozen = frozenLanes[position];
       if (isRoundVisual && !isLaneFrozen) {
         // バーの上端が爆弾の下端に接するよう、爆弾の落下率に一定のオフセットを加える
-        barHeights[position] = Math.min(96, bombTop + BAR_TOUCH_OFFSET);
+        barHeights[position] = bombTop + BAR_TOUCH_OFFSET;
       }
       const barTop = barHeights[position];
       const isTilting = tiltLane === position;
       const tiltClass = isTilting ? ` tilt-${tiltDirection}` : '';
-      return `<div class="lane ${colors[i % 5]}"><div class="helmet"></div><div class="tube"><div class="progress" style="height:${isRoundVisual && isBombLane ? Math.max(8, 100 - (state.remaining / state.duration) * 100) : 8}%"></div><div class="bar${tiltClass}" style="top:${barTop}%"></div>${isBombLane && state.status !== 'cleared' ? `<div class="bomb" style="top:${bombTop}%"></div>` : ''}${state.accepted.some((acceptedStep) => laneForStep(acceptedStep, count) === position) ? '<div class="hit">✓</div>' : ''}</div></div>`;
+      return `<div class="lane ${colors[i % 5]}"><div class="helmet"></div><div class="tube"><div class="progress" style="height:${isRoundVisual && isBombLane ? Math.max(8, 100 - (state.remaining / state.duration) * 100) : 8}%"></div><div class="bar${tiltClass}" style="top:${barTop}%"></div>${isBombLane && state.status !== 'cleared' ? `<div class="bomb" style="top:${bombTop}%"><img class="daibutu" src="/photo/daibutu.png" alt=""></div>` : ''}${state.accepted.some((acceptedStep) => laneForStep(acceptedStep, count) === position) ? '<div class="hit">✓</div>' : ''}</div></div>`;
     })
     .join('');
   return `<section class="board-screen ${state.status}${isUrgent ? ' urgent' : ''}">

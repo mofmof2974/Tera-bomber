@@ -266,6 +266,17 @@ body {
   filter: drop-shadow(4px 4px 0 var(--ink));
   transition: top 1s linear;
 }
+.daibutu {
+  position: absolute;
+  top: 20%;
+  right: 20%;
+  bottom: 10%;
+  left: 10%;
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  pointer-events: none;
+}
 .urgent .bomb {
   animation: bomb-pulse 0.5s ease-in-out infinite;
   filter: drop-shadow(4px 4px 0 var(--ink)) drop-shadow(0 0 14px var(--red))
