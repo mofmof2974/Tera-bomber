@@ -15,59 +15,37 @@ export type QuestionDetail = QuestionData;
 
 export const questionNames = ['1', '2', '3'] as const;
 
+function createTextQuestion(
+  number: string,
+  questionText: string,
+  answerCount: NumberType,
+): QuestionData {
+  return {
+    questionType: '問題文型',
+    number,
+    questionText: `${questionText} ${answerCount}個答えよ`,
+    answerCount,
+    timeLimit: answerCount === '10' ? '90' : '45',
+  };
+}
+
 export const eventData: QuestionData[] = [
   //問題文型
-  {
-    questionType: '問題文型',
-    number: '1',
-    questionText: '一等星をもつ星座　５個答えよ',
-    answerCount: '5',
-    timeLimit: '45',
-  },
-  {
-    questionType: '問題文型',
-    number: '2',
-    questionText:
-      '「特定原材料」またはそれに準ずるものとして、アレルギー表示の対象となっている品目　５個答えよ',
-    answerCount: '5',
-    timeLimit: '45',
-  },
-  {
-    questionType: '問題文型',
-    number: '3',
-    questionText: 'EUに加盟する国の首都　10個答えよ',
-    answerCount: '10',
-    timeLimit: '90',
-  },
-  {
-    questionType: '問題文型',
-    number: '4',
-    questionText: '小学校で習う のぎへん(禾）の漢字　10個答えよ',
-    answerCount: '10',
-    timeLimit: '90',
-  },
-  {
-    questionType: '問題文型',
-    number: '5',
-    questionText: '今年の夏の甲子園16強　10個答えよ',
-    answerCount: '10',
-    timeLimit: '90',
-  },
-  {
-    questionType: '問題文型',
-    number: '6',
-    questionText:
-      '昨年の紅白歌合戦に「白組」として出場したアーティスト21組※特別企画を除く　10個答えよ',
-    answerCount: '10',
-    timeLimit: '90',
-  },
-  {
-    questionType: '問題文型',
-    number: '7',
-    questionText: '「〇〇省」という名前の日本の政府機関　10個答えよ',
-    answerCount: '10',
-    timeLimit: '90',
-  },
+  createTextQuestion('1', '一等星をもつ星座', '5'),
+  createTextQuestion(
+    '2',
+    '「特定原材料」またはそれに準ずるものとして、アレルギー表示の対象となっている品目',
+    '5',
+  ),
+  createTextQuestion('3', 'EUに加盟する国の首都', '5'),
+  createTextQuestion('4', '小学校で習う のぎへん(禾）の漢字', '5'),
+  createTextQuestion('5', '今年の夏の甲子園16強', '5'),
+  createTextQuestion(
+    '6',
+    '昨年の紅白歌合戦に「白組」として出場したアーティスト21組※特別企画を除く',
+    '5',
+  ),
+  createTextQuestion('7', '「〇〇省」という名前の日本の政府機関', '5'),
   //文字出題型
   {
     questionType: '文字出題型',
@@ -113,7 +91,18 @@ export const eventData: QuestionData[] = [
     questionText: '有名な俳句　すべて答えよ',
     answerCount: '10',
     timeLimit: '90',
-    target: [],
+    target: [
+      '「？」や 月は東に 日は西に（与謝蕪村)',
+      '古池や 「？」飛び込む 水の音（松尾芭蕉)',
+      '「？」食へば 金が鳴るなり 法隆寺（正岡子規）',
+      '「？」 そこのけそこのけ お馬が通る（小林一茶）',
+      '閑さや 岩にしみ入る 「？」の声（松尾芭蕉)',
+      '「？」や 闘志いだきて 丘に立つ(高浜虚子）',
+      '分け入っても分け入っても「？」(種田山頭火)',
+      '赤い「？」 白い「？」と 落ちにけり(河東碧梧桐)',
+      '「？」を 取ってくれろと 泣く子かな(小林一茶)',
+      '「？」や つるべ取られて もらひ水(加賀千代女）',
+    ],
   },
   {
     questionType: '文字出題型',
@@ -159,14 +148,21 @@ export const eventData: QuestionData[] = [
   {
     questionType: '画像出題型',
     number: '4',
-    questionText: 'ピクトグラムの名称　全て答えよ',
+    questionText: 'アプリの名称　全て答えよ',
     answerCount: '10',
     timeLimit: '90',
   },
   {
     questionType: '画像出題型',
     number: '5',
-    questionText: 'アプリの名称　全て答えよ',
+    questionText: 'ピクトグラムの名称　全て答えよ',
+    answerCount: '10',
+    timeLimit: '90',
+  },
+  {
+    questionType: '画像出題型',
+    number: '6',
+    questionText: '日本の世界遺産の名称　全て答えよ',
     answerCount: '10',
     timeLimit: '90',
   },

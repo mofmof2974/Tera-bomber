@@ -2,11 +2,21 @@ import { eventData } from '../question-list/question-list.ts';
 
 // question-list.ts の問題データを管理画面/表示画面が扱う形式に変換する
 function toApiQuestion(question) {
-  const type = question.questionType === '文字出題型' ? 'char' : 'text';
+  const type =
+    question.questionType === '文字出題型'
+      ? 'char'
+      : question.questionType === '画像出題型'
+        ? 'image'
+        : 'text';
   const count = Number(question.answerCount) === 10 ? 10 : 5;
-  const duration = Number(question.timeLimit) || 60;
-  return {
-    id: question.number,
+  const duration =
+    type === 'text'
+      ? count === 10
+        ? 90
+        : 45
+      : Number(question.timeLimit) || 60;
+  const result = {
+    id: `${question.questionType}:${question.number}`,
     number: question.number,
     type,
     questionType: question.questionType,
@@ -18,6 +28,13 @@ function toApiQuestion(question) {
     timeLimit: String(duration),
     target: question.target || [],
   };
+  if (type === 'image') {
+    result.images = Array.from(
+      { length: 10 },
+      (_, index) => `/photo-list/${question.number}/${index + 1}.jpg`,
+    );
+  }
+  return result;
 }
 
 const questions = eventData.map(toApiQuestion);

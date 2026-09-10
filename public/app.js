@@ -78,6 +78,8 @@ function laneForStep(step, count) {
 }
 // 回答欄(回答者ごと5個)の入力中の値。再描画や送信時にstate.answerTextsより優先して使う
 const answerDrafts = {};
+const questionCountDrafts = {};
+let questionSelectionDraftId = null;
 document.addEventListener('input', (event) => {
   const id = event.target && event.target.id;
   if (!id || !id.startsWith('answer-')) return;
@@ -104,21 +106,26 @@ const failAudio = new Audio('/bgm/failbgm.mp3');
 let audioUnlocked = false;
 const sfxAudios = [...goodAudios, ...badAudios];
 function unlockAudio() {
-  if (audioUnlocked) return;
+  if (audioUnlocked || isAdmin) return;
   audioUnlocked = true;
   [bgmAudio, ...sfxAudios, clearAudio, failAudio].forEach((audio) => {
+    audio.muted = true;
     audio
       .play()
       .then(() => {
         audio.pause();
         audio.currentTime = 0;
+        audio.muted = false;
       })
-      .catch(() => {});
+      .catch(() => {
+        audio.muted = false;
+      });
   });
 }
 document.addEventListener('click', unlockAudio, { once: true });
 document.addEventListener('keydown', unlockAudio, { once: true });
 function playSfx(type) {
+  if (isAdmin) return;
   const audios = type === 'good' ? goodAudios : badAudios;
   const audio = audios.find((candidate) => candidate.paused || candidate.ended);
   if (!audio) return;
@@ -177,15 +184,40 @@ function normalizeQuestionType(value) {
 function normalizeQuestionText(question = {}) {
   return question.text ?? question.questionText ?? '';
 }
+function formatQuestionText(question = {}, count) {
+  const text = normalizeQuestionText(question);
+  if (normalizeQuestionType(question.type ?? question.questionType) !== 'text')
+    return text;
+  const answerCount = normalizeAnswerCount(
+    count ?? question.count ?? question.answerCount,
+    5,
+  );
+  return text.replace(/(?:5|10|５|１０)個答えよ/g, `${answerCount}個答えよ`);
+}
 function normalizeAnswerCount(value, fallback = 5) {
   const count = Number(value ?? fallback);
   return count === 10 ? 10 : 5;
+}
+function durationForAnswerCount(value) {
+  return normalizeAnswerCount(value, 5) === 10 ? 90 : 45;
+}
+function durationForQuestion(question = {}, count, fallback = 60) {
+  const type = normalizeQuestionType(question.type ?? question.questionType);
+  return type === 'text'
+    ? durationForAnswerCount(count ?? question.count ?? question.answerCount)
+    : normalizeDuration(question, fallback);
 }
 function normalizeDuration(question = {}, fallback = 60) {
   return Number(question.duration ?? question.timeLimit) || fallback;
 }
 function normalizeQuestionNumber(question = {}) {
   return String(question.number ?? '01');
+}
+function normalizeQuestionId(question = {}) {
+  return String(
+    question.id ??
+      `${question.questionType ?? question.type ?? 'text'}:${normalizeQuestionNumber(question)}`,
+  );
 }
 function toImageList(question = {}) {
   const rawValue =
@@ -215,23 +247,27 @@ socket.on('state', (state) => {
     barHeights = Array(5).fill(BAR_TOUCH_OFFSET);
     frozenLanes = Array(5).fill(false);
   }
-  if (isRunning && previousStatus !== 'running') {
+  if (!isAdmin && isRunning && previousStatus !== 'running') {
     bgmAudio.currentTime = 0;
     bgmAudio.play().catch(() => {});
-  } else if (!isRunning && previousStatus === 'running') {
+  } else if (!isAdmin && !isRunning && previousStatus === 'running') {
     bgmAudio.pause();
   }
-  if (state.status === 'cleared' && previousStatus !== 'cleared') {
+  if (!isAdmin && state.status === 'cleared' && previousStatus !== 'cleared') {
     clearAudio.currentTime = 0;
     clearAudio.play().catch(() => {});
-  } else if (state.status !== 'cleared' && previousStatus === 'cleared') {
+  } else if (
+    !isAdmin &&
+    state.status !== 'cleared' &&
+    previousStatus === 'cleared'
+  ) {
     clearAudio.pause();
     clearAudio.currentTime = 0;
   }
-  if (state.status === 'over' && previousStatus !== 'over') {
+  if (!isAdmin && state.status === 'over' && previousStatus !== 'over') {
     failAudio.currentTime = 0;
     failAudio.play().catch(() => {});
-  } else if (state.status !== 'over' && previousStatus === 'over') {
+  } else if (!isAdmin && state.status !== 'over' && previousStatus === 'over') {
     failAudio.pause();
     failAudio.currentTime = 0;
   }
@@ -297,29 +333,29 @@ function boardTemplate(state) {
   const positions = Array.from({ length: 5 }, (_, i) => i);
   const images = toImageList(question).slice(0, count);
   const targetList = toTargetList(question).slice(0, count);
-  const questionText = normalizeQuestionText(question);
+  const questionText = formatQuestionText(question, count);
   // タイマーは常に表示、問題文は管理画面の表示/非表示トグルに従う
   const isActive = state.status === 'running';
   const isQuestionVisible = Boolean(state.questionVisible);
   const timerText = `${String(Math.floor(state.remaining / 60)).padStart(2, '0')}:${String(state.remaining % 60).padStart(2, '0')}`;
-  const questionPanelContent = isQuestionVisible
-    ? normalizedType === 'image'
-      ? images
-          .map(
-            (image, i) =>
-              `<div class="question-image"><img src="${escapeHtml(image)}" alt="出題画像 ${i + 1}">${state.accepted.includes(i) ? '<span class="check" aria-label="正解"></span>' : ''}</div>`,
-          )
-          .join('')
-      : `<p>${escapeHtml(questionText)}</p>`
-    : '';
-  const targetPanel =
-    normalizedType === 'char' && isQuestionVisible
-      ? `<aside class="target-panel" aria-label="出題対象">${targetList
-          .map(
-            (item, i) =>
-              `<div class="char-tile"><span>${escapeHtml(item)}</span>${state.accepted.includes(i) ? '<span class="check" aria-label="正解"></span>' : ''}</div>`,
-          )
-          .join('')}</aside>`
+  const questionPanelContent =
+    isQuestionVisible && normalizedType === 'text'
+      ? `<p>${escapeHtml(questionText)}</p>`
+      : '';
+  const questionHeader =
+    isQuestionVisible &&
+    (normalizedType === 'char' || normalizedType === 'image')
+      ? `<div class="question-panel question-header"><p>${escapeHtml(questionText)}</p></div>`
+      : '';
+  const answerCards =
+    isQuestionVisible &&
+    (normalizedType === 'char' || normalizedType === 'image')
+      ? Array.from({ length: count }, (_, i) => {
+          const isAccepted = state.accepted.includes(i);
+          return normalizedType === 'image'
+            ? `<div class="answer-card${isAccepted ? ' accepted' : ''}"><img src="${escapeHtml(images[i] || '')}" alt="出題画像 ${i + 1}">${isAccepted ? '<span class="check" aria-label="正解"></span>' : ''}</div>`
+            : `<div class="answer-card${isAccepted ? ' accepted' : ''}"><span>${escapeHtml(targetList[i] || '')}</span>${isAccepted ? '<span class="check" aria-label="正解"></span>' : ''}</div>`;
+        }).join('')
       : '';
   const isUrgent = isActive && state.remaining <= 10;
   // クリア/オーバー後もその瞬間の爆弾位置・水位で画面を固定表示する
@@ -360,8 +396,8 @@ function boardTemplate(state) {
     : '<div class="fullscreen-start"><button id="start-play-screen" type="button">全画面で開始</button></div>';
   return `<section class="board-screen ${state.status}${isUrgent ? ' urgent' : ''}">
     <header class="topbar"><div class="timer">${timerText}</div><button class="fullscreen-toggle" id="toggle-fullscreen" type="button" aria-pressed="${isPlayScreenFullscreen()}" aria-label="${fullscreenLabel}">${fullscreenLabel}</button></header>
-    <div class="question-panel ${isQuestionVisible && normalizedType === 'image' ? 'image-question' : ''}">${questionPanelContent}</div>
-    ${targetPanel}
+    ${questionHeader}
+    <div class="question-panel ${isQuestionVisible && (normalizedType === 'char' || normalizedType === 'image') ? `answer-card-grid answer-card-grid-${count}` : ''}">${questionPanelContent}${answerCards}</div>
     <div class="lanes">${laneHtml}</div>
     <div class="answer-panel">${answerTexts.map((text, i) => `<div class="answer-slot"><span class="answer-slot-label">P${i + 1}</span><b>${escapeHtml(text) || '　'}</b></div>`).join('')}</div>
     ${resultBanner}
@@ -371,10 +407,11 @@ function boardTemplate(state) {
 function adminTemplate(state) {
   const active = state.question || {};
   const pendingQuestion = state.pendingQuestion || active;
-  const currentId = normalizeQuestionNumber(pendingQuestion);
+  const currentId =
+    questionSelectionDraftId || normalizeQuestionId(pendingQuestion);
   const selected =
     availableQuestions.find(
-      (question) => normalizeQuestionNumber(question) === currentId,
+      (question) => normalizeQuestionId(question) === currentId,
     ) ||
     availableQuestions[0] ||
     pendingQuestion;
@@ -382,10 +419,17 @@ function adminTemplate(state) {
     selected.type ?? selected.questionType,
   );
   const currentCount = normalizeAnswerCount(
-    selected.count ?? selected.answerCount,
+    questionCountDrafts[normalizeQuestionId(selected)] ??
+      (normalizeQuestionId(pendingQuestion) === normalizeQuestionId(selected)
+        ? (pendingQuestion.count ?? pendingQuestion.answerCount)
+        : (selected.count ?? selected.answerCount)),
     5,
   );
-  const currentDuration = normalizeDuration(selected, state.duration);
+  const currentDuration = durationForQuestion(
+    selected,
+    currentCount,
+    state.duration,
+  );
   const typeLabel =
     currentType === 'char'
       ? '文字出題型'
@@ -403,20 +447,21 @@ function adminTemplate(state) {
     displayQuestion.type ?? displayQuestion.questionType,
   );
   const activeTargetList = toTargetList(displayQuestion);
+  const activeImageList = toImageList(displayQuestion);
   const displayCount = normalizeAnswerCount(
     displayQuestion.count ?? displayQuestion.answerCount,
     5,
   );
   const pendingLabel = state.pendingQuestion
-    ? `${escapeHtml(normalizeQuestionNumber(state.pendingQuestion))}. ${escapeHtml(normalizeQuestionText(state.pendingQuestion))}`
+    ? `${escapeHtml(normalizeQuestionNumber(state.pendingQuestion))}. ${escapeHtml(formatQuestionText(state.pendingQuestion, state.pendingQuestion.count ?? state.pendingQuestion.answerCount))}`
     : '未選択';
   const activeLabel =
     state.status === 'running'
-      ? `${escapeHtml(normalizeQuestionNumber(active))}. ${escapeHtml(normalizeQuestionText(active))}`
+      ? `${escapeHtml(normalizeQuestionNumber(active))}. ${escapeHtml(formatQuestionText(active, active.count ?? active.answerCount))}`
       : '停止中（タイマー開始で反映されます）';
   const shiftButtons = `<div class="shift-control"><button class="shift-back" id="shift-back">◀戻す</button><button class="shift-forward" id="shift-forward">進む▶</button></div>`;
   const judgeContent =
-    activeType === 'char'
+    activeType === 'char' || activeType === 'image'
       ? `<div class="answer-grid">${Array.from(
           { length: displayCount },
           (_, i) => {
@@ -426,7 +471,11 @@ function adminTemplate(state) {
               : (state.rejected || []).includes(i)
                 ? 'wrong'
                 : 'none';
-            return `<div class="answer-item"><span class="answer-label">${escapeHtml(label)}</span><button class="answer-toggle status-${status}" data-index="${i}" data-status="${status}"></button></div>`;
+            const answerContent =
+              activeType === 'image'
+                ? `<img class="admin-answer-image" src="${escapeHtml(activeImageList[i] || '')}" alt="出題画像 ${i + 1}">`
+                : `<span class="answer-label">${escapeHtml(label)}</span>`;
+            return `<div class="answer-item">${answerContent}<button class="answer-toggle status-${status}" data-index="${i}" data-status="${status}" aria-label="${escapeHtml(label)}の判定"></button></div>`;
           },
         ).join('')}${shiftButtons}`
       : `<div class="answer-fields">${Array.from(
@@ -436,8 +485,12 @@ function adminTemplate(state) {
         ).join(
           '',
         )}</div><div><button class="correct" id="correct">正解 ✓</button><button class="wrong" id="wrong">不正解 ×</button></div>${shiftButtons}`;
+  const countControl =
+    currentType === 'text'
+      ? `<select id="answer-count-select"><option value="5" ${currentCount === 5 ? 'selected' : ''}>5問</option><option value="10" ${currentCount === 10 ? 'selected' : ''}>10問</option></select>`
+      : `<span class="readonly-value" id="answer-count-display">${currentCount}問</span>`;
   return `<section class="admin-shell"><header class="admin-header"><div><span class="eyebrow">CULTURAL FESTIVAL / CONTROL ROOM</span><h1>Tera Bomber <em>司会者コンソール</em></h1></div><a class="view-link" href="/" target="_blank">表示画面を開く ↗</a></header>
-    <div class="admin-grid"><div class="control-panel"><h2>ROUND SETUP</h2><label>出題する問題<select id="question-select">${availableQuestions.map((question) => `<option value="${escapeHtml(normalizeQuestionNumber(question))}" ${normalizeQuestionNumber(question) === currentId ? 'selected' : ''}>${escapeHtml(normalizeQuestionNumber(question))}. ${escapeHtml(normalizeQuestionText(question))}</option>`).join('')}</select></label><div class="split"><label>問題形式<span class="readonly-value" id="question-type-display">${escapeHtml(typeLabel)}</span></label><label>回答数<span class="readonly-value" id="answer-count-display">${currentCount}問</span></label></div><label>制限時間<span class="readonly-value" id="duration-display">${currentDuration}秒</span></label><label>問題文<div class="readonly-value question-preview" id="question-preview">${escapeHtml(normalizeQuestionText(selected))}</div></label><button class="primary" id="apply-question">問題をセットする</button><div class="pending-banner" id="pending-banner">✔ 次回タイマー開始でセットされる問題: <strong>${pendingLabel}</strong></div></div>
+    <div class="admin-grid"><div class="control-panel"><h2>ROUND SETUP</h2><label>出題する問題<select id="question-select">${availableQuestions.map((question) => `<option value="${escapeHtml(normalizeQuestionId(question))}" ${normalizeQuestionId(question) === currentId ? 'selected' : ''}>${escapeHtml(normalizeQuestionNumber(question))}. ${escapeHtml(formatQuestionText(question, question.count ?? question.answerCount))}</option>`).join('')}</select></label><div class="split"><label>問題形式<span class="readonly-value" id="question-type-display">${escapeHtml(typeLabel)}</span></label><label>回答数${countControl}</label></div><label>制限時間<span class="readonly-value" id="duration-display">${currentDuration}秒</span></label><label>問題文<div class="readonly-value question-preview" id="question-preview">${escapeHtml(formatQuestionText(selected, currentCount))}</div></label><button class="primary" id="apply-question">問題をセットする</button><div class="pending-banner" id="pending-banner">✔ 次回タイマー開始でセットされる問題: <strong>${pendingLabel}</strong></div></div>
     <div class="control-panel live"><div class="panel-title"><h2>LIVE CONTROL</h2><span class="live-dot">● ${state.status.toUpperCase()}</span></div><div class="active-question" id="active-question">出題中: <strong>${activeLabel}</strong></div><div class="big-time">${String(Math.floor(state.remaining / 60)).padStart(2, '0')}:${String(state.remaining % 60).padStart(2, '0')}</div><div class="control-actions"><button class="primary" id="start">${state.running ? 'タイマー進行中' : 'タイマーを開始'}</button><button id="reset">ラウンドをリセット</button></div><div class="control-actions"><button class="${state.questionVisible ? 'wrong' : 'correct'}" id="toggle-question-visible">${state.questionVisible ? '問題文を非表示にする' : '問題文を表示する'}</button></div><div class="judge">${judgeContent}</div><div class="position-control"><span>爆弾位置</span>${Array.from({ length: activeCount === 10 ? 10 : 5 }, (_, i) => `<button class="position ${i === state.bombPosition ? 'selected' : ''}" data-position="${i}">${i + 1}</button>`).join('')}</div></div></div></section>`;
 }
 document.addEventListener('click', (event) => {
@@ -449,23 +502,27 @@ document.addEventListener('click', (event) => {
   if (id === 'toggle-question-visible')
     socket.emit('admin:setQuestionVisible', !currentState.questionVisible);
   if (id === 'apply-question') {
+    const selectedQuestionId =
+      questionSelectionDraftId ||
+      document.querySelector('#question-select').value;
     const selected =
       availableQuestions.find(
-        (question) =>
-          normalizeQuestionNumber(question) ===
-          document.querySelector('#question-select').value,
+        (question) => normalizeQuestionId(question) === selectedQuestionId,
       ) || {};
     const normalizedType = normalizeQuestionType(
       selected.type ?? selected.questionType,
     );
-    const normalizedCount = normalizeAnswerCount(
-      selected.count ?? selected.answerCount,
-      5,
-    );
-    const duration = normalizeDuration(selected, currentState.duration);
+    const countSelect = document.querySelector('#answer-count-select');
+    const normalizedCount =
+      normalizedType === 'text' && countSelect
+        ? normalizeAnswerCount(countSelect.value, 5)
+        : normalizeAnswerCount(selected.count ?? selected.answerCount, 5);
+    questionCountDrafts[normalizeQuestionId(selected)] = normalizedCount;
+    questionSelectionDraftId = normalizeQuestionId(selected);
+    const duration = durationForQuestion(selected, normalizedCount, 60);
     socket.emit('admin:setQuestion', {
       ...selected,
-      id: selected.id || normalizeQuestionNumber(selected),
+      id: normalizeQuestionId(selected),
       number: normalizeQuestionNumber(selected),
       type: normalizedType,
       questionType:
@@ -476,8 +533,8 @@ document.addEventListener('click', (event) => {
             : '問題文型',
       count: normalizedCount,
       answerCount: String(normalizedCount),
-      text: normalizeQuestionText(selected),
-      questionText: normalizeQuestionText(selected),
+      text: formatQuestionText(selected, normalizedCount),
+      questionText: formatQuestionText(selected, normalizedCount),
       target: toTargetList(selected),
       duration,
       timeLimit: String(duration),
@@ -506,9 +563,27 @@ document.addEventListener('click', (event) => {
   }
 });
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'answer-count-select') {
+    const selectedQuestion = availableQuestions.find(
+      (item) =>
+        normalizeQuestionId(item) ===
+        document.querySelector('#question-select').value,
+    );
+    if (!selectedQuestion) return;
+    const selectedQuestionId = normalizeQuestionId(selectedQuestion);
+    const selectedCount = normalizeAnswerCount(event.target.value, 5);
+    questionCountDrafts[selectedQuestionId] = selectedCount;
+    const display = document.querySelector('#answer-count-display');
+    if (display) display.textContent = `${selectedCount}問`;
+    const preview = document.querySelector('#question-preview');
+    if (selectedQuestion && preview)
+      preview.textContent = formatQuestionText(selectedQuestion, selectedCount);
+    return;
+  }
   if (event.target.id !== 'question-select') return;
+  questionSelectionDraftId = event.target.value;
   const question = availableQuestions.find(
-    (item) => normalizeQuestionNumber(item) === event.target.value,
+    (item) => normalizeQuestionId(item) === event.target.value,
   );
   if (!question) return;
   const normalizedType = normalizeQuestionType(
@@ -518,16 +593,21 @@ document.addEventListener('change', (event) => {
     question.count ?? question.answerCount,
     5,
   );
-  const duration = normalizeDuration(question, 60);
+  const selectedQuestionId = normalizeQuestionId(question);
+  const selectedCount =
+    questionCountDrafts[selectedQuestionId] ?? normalizedCount;
+  const duration = durationForQuestion(question, selectedCount, 60);
+  const answerCountSelect = document.querySelector('#answer-count-select');
+  if (answerCountSelect) answerCountSelect.value = String(selectedCount);
   document.querySelector('#question-type-display').textContent =
     normalizedType === 'char'
       ? '文字出題型'
       : normalizedType === 'image'
         ? '画像出題型'
         : '問題文型';
-  document.querySelector('#answer-count-display').textContent =
-    `${normalizedCount}問`;
+  const answerCountDisplay = document.querySelector('#answer-count-display');
+  if (answerCountDisplay) answerCountDisplay.textContent = `${selectedCount}問`;
   document.querySelector('#duration-display').textContent = `${duration}秒`;
   document.querySelector('#question-preview').textContent =
-    normalizeQuestionText(question) || '';
+    formatQuestionText(question, selectedCount) || '';
 });
