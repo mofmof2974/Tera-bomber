@@ -75,11 +75,16 @@ body {
 .topbar {
   position: fixed;
   top: 10px;
+  left: 16px;
   right: 16px;
   z-index: 11;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.topbar > * {
+  pointer-events: auto;
 }
 .timer {
   font: 800 clamp(34px, 5.5vw, 64px) 'Barlow Condensed';
@@ -132,7 +137,7 @@ body {
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(85%, 1300px);
+  width: min(calc(100% - 360px), 1100px);
   height: 120px;
   margin: 0;
   max-width: none;
@@ -737,9 +742,19 @@ button {
   .helmet {
     padding: 6px 0;
   }
+  .timer {
+    font-size: clamp(24px, 5vw, 40px);
+    padding: 6px 12px;
+    border-width: 3px;
+    box-shadow: 3px 3px 0 var(--lime);
+  }
+  .fullscreen-toggle {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
   .question-panel {
-    width: min(94%, 700px);
-    padding: 12px;
+    width: min(calc(100% - 220px), 700px);
+    padding: 10px 14px;
     height: 100px;
   }
   .question-panel.answer-card-grid {
